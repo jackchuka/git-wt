@@ -100,7 +100,13 @@ func FindWorktreeByBranch(branch string) (*Worktree, error) {
 }
 
 // AddWorktree creates a new worktree for the given branch.
-func AddWorktree(path, branch string) error {
+func AddWorktree(path, branch string, copyOpts CopyOptions) error {
+	// Get source root before creating worktree
+	srcRoot, err := GetRepoRoot()
+	if err != nil {
+		return err
+	}
+
 	// Ensure parent directory exists
 	parentDir := filepath.Dir(path)
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
@@ -114,11 +120,26 @@ func AddWorktree(path, branch string) error {
 	// Output git messages to stderr so stdout only contains the path for shell integration
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	// Copy files to new worktree
+	if err := CopyFilesToWorktree(srcRoot, path, copyOpts); err != nil {
+		return fmt.Errorf("failed to copy files: %w", err)
+	}
+
+	return nil
 }
 
 // AddWorktreeWithNewBranch creates a new worktree with a new branch.
-func AddWorktreeWithNewBranch(path, branch string) error {
+func AddWorktreeWithNewBranch(path, branch string, copyOpts CopyOptions) error {
+	// Get source root before creating worktree
+	srcRoot, err := GetRepoRoot()
+	if err != nil {
+		return err
+	}
+
 	// Ensure parent directory exists
 	parentDir := filepath.Dir(path)
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
@@ -132,7 +153,16 @@ func AddWorktreeWithNewBranch(path, branch string) error {
 	// Output git messages to stderr so stdout only contains the path for shell integration
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	// Copy files to new worktree
+	if err := CopyFilesToWorktree(srcRoot, path, copyOpts); err != nil {
+		return fmt.Errorf("failed to copy files: %w", err)
+	}
+
+	return nil
 }
 
 // RemoveWorktree removes a worktree.

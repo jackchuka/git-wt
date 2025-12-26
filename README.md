@@ -73,3 +73,33 @@ Supported template variables:
 - `{gitroot}`: repository root directory name
 
 Default: `../{gitroot}-wt`
+
+### `wt.copyignored`
+
+Copy files ignored by `.gitignore` (e.g., `.env`) to new worktrees.
+
+``` console
+$ git config wt.copyignored true
+```
+
+Default: `false`
+
+### `wt.copyuntracked`
+
+Copy untracked files (not yet added to git) to new worktrees.
+
+``` console
+$ git config wt.copyuntracked true
+```
+
+Default: `false`
+
+### `wt.copymodified`
+
+Copy modified files (tracked but with uncommitted changes) to new worktrees.
+
+``` console
+$ git config wt.copymodified true
+```
+
+Default: `false`
