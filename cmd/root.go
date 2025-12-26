@@ -71,7 +71,19 @@ Configuration:
     Worktree base directory.
     Supported template variables: {gitroot} (repository root directory name)
     Default: ../{gitroot}-wt
-    Example: git config wt.basedir "../{gitroot}-worktrees"`,
+    Example: git config wt.basedir "../{gitroot}-worktrees"
+
+  wt.copyignored
+    Copy .gitignore'd files (e.g., .env) to new worktrees.
+    Default: false
+
+  wt.copyuntracked
+    Copy untracked files to new worktrees.
+    Default: false
+
+  wt.copymodified
+    Copy modified files to new worktrees.
+    Default: false`,
 	RunE:              runRoot,
 	Args:              cobra.MaximumNArgs(1),
 	ValidArgsFunction: completeBranches,
@@ -253,6 +265,12 @@ func handleWorktree(branch string) error {
 		return fmt.Errorf("failed to get worktree path: %w", err)
 	}
 
+	// Get copy options
+	copyOpts, err := git.GetCopyOptions()
+	if err != nil {
+		return fmt.Errorf("failed to get copy options: %w", err)
+	}
+
 	// Check if branch exists
 	exists, err := git.BranchExists(branch)
 	if err != nil {
@@ -261,12 +279,12 @@ func handleWorktree(branch string) error {
 
 	if exists {
 		// Branch exists, create worktree with existing branch
-		if err := git.AddWorktree(wtPath, branch); err != nil {
+		if err := git.AddWorktree(wtPath, branch, copyOpts); err != nil {
 			return fmt.Errorf("failed to create worktree: %w", err)
 		}
 	} else {
 		// Branch doesn't exist, create new branch and worktree
-		if err := git.AddWorktreeWithNewBranch(wtPath, branch); err != nil {
+		if err := git.AddWorktreeWithNewBranch(wtPath, branch, copyOpts); err != nil {
 			return fmt.Errorf("failed to create worktree with new branch: %w", err)
 		}
 	}
