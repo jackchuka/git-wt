@@ -9,9 +9,10 @@ import (
 const bashGitWrapper = `
 # Override git command to cd after 'git wt <branch>'
 git() {
-    if [[ "$1" == "wt" && -n "$2" && "$2" != -* ]]; then
+    if [[ "$1" == "wt" ]]; then
+        shift
         local result
-        result=$(command git wt "$2")
+        result=$(command git wt "$@")
         local exit_code=$?
         if [[ $exit_code -eq 0 && -d "$result" ]]; then
             cd "$result"
@@ -41,9 +42,10 @@ _git_wt() {
 const zshGitWrapper = `
 # Override git command to cd after 'git wt <branch>'
 git() {
-    if [[ "$1" == "wt" && -n "$2" && "$2" != -* ]]; then
+    if [[ "$1" == "wt" ]]; then
+        shift
         local result
-        result=$(command git wt "$2")
+        result=$(command git wt "$@")
         local exit_code=$?
         if [[ $exit_code -eq 0 && -d "$result" ]]; then
             cd "$result"
@@ -71,8 +73,8 @@ _git_wt() {
 const fishGitWrapper = `
 # Override git command to cd after 'git wt <branch>'
 function git --wraps git
-    if test "$argv[1]" = "wt" -a -n "$argv[2]" -a (string sub -l 1 -- "$argv[2]") != "-"
-        set -l result (command git wt $argv[2])
+    if test "$argv[1]" = "wt"
+        set -l result (command git wt $argv[2..])
         set -l exit_code $status
         if test $exit_code -eq 0 -a -d "$result"
             cd "$result"
@@ -104,8 +106,9 @@ complete -c git -n '__fish_git_wt_needs_branch' -f -a '(__fish_git_wt_branches)'
 const powershellGitWrapper = `
 # Override git command to cd after 'git wt <branch>'
 function Invoke-Git {
-    if ($args[0] -eq "wt" -and $args[1] -and $args[1] -notlike "-*") {
-        $result = & git.exe wt $args[1] 2>&1
+    if ($args[0] -eq "wt") {
+        $wtArgs = $args[1..($args.Length-1)]
+        $result = & git.exe wt @wtArgs 2>&1
         if ($LASTEXITCODE -eq 0 -and (Test-Path $result -PathType Container)) {
             Set-Location $result
         } else {
