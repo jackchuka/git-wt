@@ -491,6 +491,17 @@ func TestE2E_WorktreeFromWorktree(t *testing.T) {
 	if _, err := os.Stat(wt2Path); os.IsNotExist(err) {
 		t.Errorf("second worktree was not created at %s", wt2Path)
 	}
+
+	// Verify worktree paths are created under the same basedir
+	expectedWt1Path := filepath.Clean(filepath.Join(repo.Root, "../repo-wt/feature1"))
+	if wt1Path != expectedWt1Path {
+		t.Errorf("first worktree path = %q, want %q", wt1Path, expectedWt1Path)
+	}
+
+	expectedWt2Path := filepath.Clean(filepath.Join(repo.Root, "../repo-wt/feature2"))
+	if wt2Path != expectedWt2Path {
+		t.Errorf("second worktree path = %q, want %q", wt2Path, expectedWt2Path)
+	}
 }
 
 func TestE2E_CopyIgnored(t *testing.T) {

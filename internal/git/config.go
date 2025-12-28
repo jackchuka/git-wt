@@ -83,7 +83,7 @@ func MainRepoRoot(ctx context.Context) (string, error) {
 
 // RepoName returns the name of the current git repository (directory name).
 func RepoName(ctx context.Context) (string, error) {
-	root, err := RepoRoot(ctx)
+	root, err := MainRepoRoot(ctx)
 	if err != nil {
 		return "", err
 	}
