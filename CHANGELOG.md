@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.4.0](https://github.com/k1LoW/git-wt/compare/v0.3.0...v0.4.0) - 2025-12-28
+### New Features 🎉
+- feat: add config override flags (`--basedir`, `--copyignored`, `--copyuntracked`, `--copymodified`) by @k1LoW in https://github.com/k1LoW/git-wt/pull/19
+### Fix bug 🐛
+- fix: ensure worktrees use correct base directory when created from another worktree by @tnagatomi in https://github.com/k1LoW/git-wt/pull/18
+
 ## [v0.3.0](https://github.com/k1LoW/git-wt/compare/v0.2.3...v0.3.0) - 2025-12-27
 ### Breaking Changes 🛠
 - fix: set gostyle by @k1LoW in https://github.com/k1LoW/git-wt/pull/16
