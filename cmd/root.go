@@ -260,28 +260,33 @@ func listWorktrees(ctx context.Context) error {
 		return fmt.Errorf("failed to get current worktree: %w", err)
 	}
 
-	table := tablewriter.NewTable(os.Stdout, tablewriter.WithHeader([]string{"", "PATH", "BRANCH", "HEAD"}), tablewriter.WithRendition(tw.Rendition{
-		Borders: tw.Border{
-			Left:   tw.Off,
-			Right:  tw.Off,
-			Top:    tw.Off,
-			Bottom: tw.Off,
-		},
-		Settings: tw.Settings{
-			Separators: tw.Separators{
-				ShowHeader:     tw.Off,
-				ShowFooter:     tw.Off,
-				BetweenRows:    tw.Off,
-				BetweenColumns: tw.Off,
+	table := tablewriter.NewTable(os.Stdout,
+		tablewriter.WithHeader([]string{"", "PATH", "BRANCH", "HEAD"}),
+		tablewriter.WithHeaderAlignment(tw.AlignLeft),
+		tablewriter.WithHeaderPaddingPerColumn([]tw.Padding{tw.PaddingNone}),
+		tablewriter.WithRowPaddingPerColumn([]tw.Padding{tw.PaddingNone}),
+		tablewriter.WithRendition(tw.Rendition{
+			Borders: tw.Border{
+				Left:   tw.Off,
+				Right:  tw.Off,
+				Top:    tw.Off,
+				Bottom: tw.Off,
 			},
-			Lines: tw.Lines{
-				ShowTop:        tw.Off,
-				ShowBottom:     tw.Off,
-				ShowHeaderLine: tw.Off,
-				ShowFooterLine: tw.Off,
+			Settings: tw.Settings{
+				Separators: tw.Separators{
+					ShowHeader:     tw.Off,
+					ShowFooter:     tw.Off,
+					BetweenRows:    tw.Off,
+					BetweenColumns: tw.Off,
+				},
+				Lines: tw.Lines{
+					ShowTop:        tw.Off,
+					ShowBottom:     tw.Off,
+					ShowHeaderLine: tw.Off,
+					ShowFooterLine: tw.Off,
+				},
 			},
-		},
-	}))
+		}))
 
 	for _, wt := range worktrees {
 		marker := ""
