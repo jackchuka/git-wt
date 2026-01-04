@@ -98,7 +98,6 @@ _git-wt() {
     done < <(command git-wt __complete "${words[CURRENT]}" 2>/dev/null)
     _describe 'git-wt' completions
 }
-compdef _git-wt git-wt
 
 # Hook into git completion for 'git wt'
 _git-wt-wrapper() {
@@ -112,7 +111,12 @@ _git-wt-wrapper() {
         _git
     fi
 }
-compdef _git-wt-wrapper git
+
+# Register completions if compdef is available
+if (( $+functions[compdef] )); then
+    compdef _git-wt git-wt
+    compdef _git-wt-wrapper git
+fi
 `
 
 // Fish hooks.

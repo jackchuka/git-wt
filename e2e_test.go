@@ -410,7 +410,7 @@ func TestE2E_InitScript(t *testing.T) {
 		},
 		{
 			shell:    "zsh",
-			contains: []string{"# git-wt shell hook for zsh", "_git_wt()"},
+			contains: []string{"# git-wt shell hook for zsh", "_git-wt()"},
 		},
 		{
 			shell:    "fish",
