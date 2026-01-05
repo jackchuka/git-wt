@@ -1274,8 +1274,9 @@ pwd
 	}
 }
 
-// TestE2E_NocdConfigWithInitNocd tests that --init with wt.nocd config also disables git() wrapper.
-func TestE2E_NocdConfigWithInitNocd(t *testing.T) {
+// TestE2E_NocdConfigWithInit tests that --init ignores wt.nocd config and always outputs git() wrapper.
+// The wt.nocd config only affects cd behavior at runtime, not the init output.
+func TestE2E_NocdConfigWithInit(t *testing.T) {
 	binPath := buildBinary(t)
 
 	repo := testutil.NewTestRepo(t)
@@ -1293,9 +1294,10 @@ func TestE2E_NocdConfigWithInitNocd(t *testing.T) {
 		t.Fatalf("git-wt --init bash failed: %v\noutput: %s", err, out)
 	}
 
-	// With wt.nocd=true config, output should not contain git wrapper
-	if strings.Contains(out, "git() {") {
-		t.Error("output should not contain git wrapper when wt.nocd=true config is set")
+	// With wt.nocd=true config, --init should still output git wrapper
+	// (wt.nocd only affects runtime cd behavior, not init output)
+	if !strings.Contains(out, "git() {") {
+		t.Error("output should contain git wrapper even when wt.nocd=true config is set")
 	}
 }
 

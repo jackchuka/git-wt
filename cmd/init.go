@@ -13,6 +13,10 @@ git() {
     if [[ "$1" == "wt" ]]; then
         shift
         local no_switch=false
+        # Check wt.nocd config
+        if [[ "$(command git config --get wt.nocd 2>/dev/null)" == "true" ]]; then
+            no_switch=true
+        fi
         local args=()
         for arg in "$@"; do
             if [[ "$arg" == "--nocd" || "$arg" == "--no-switch-directory" ]]; then
@@ -58,6 +62,10 @@ git() {
     if [[ "$1" == "wt" ]]; then
         shift
         local no_switch=false
+        # Check wt.nocd config
+        if [[ "$(command git config --get wt.nocd 2>/dev/null)" == "true" ]]; then
+            no_switch=true
+        fi
         local args=()
         for arg in "$@"; do
             if [[ "$arg" == "--nocd" || "$arg" == "--no-switch-directory" ]]; then
@@ -125,6 +133,10 @@ const fishGitWrapper = `
 function git --wraps git
     if test "$argv[1]" = "wt"
         set -l no_switch false
+        # Check wt.nocd config
+        if test "$(command git config --get wt.nocd 2>/dev/null)" = "true"
+            set no_switch true
+        end
         for arg in $argv[2..]
             if test "$arg" = "--nocd" -o "$arg" = "--no-switch-directory"
                 set no_switch true
@@ -171,6 +183,13 @@ function Invoke-Git {
     if ($args[0] -eq "wt") {
         $wtArgs = $args[1..($args.Length-1)]
         $noSwitch = ($wtArgs -contains "--nocd") -or ($wtArgs -contains "--no-switch-directory")
+        # Check wt.nocd config
+        if (-not $noSwitch) {
+            $nocdConfig = & git.exe config --get wt.nocd 2>$null
+            if ($nocdConfig -eq "true") {
+                $noSwitch = $true
+            }
+        }
         $result = & git.exe wt @wtArgs 2>&1
         if ($LASTEXITCODE -eq 0 -and (Test-Path $result -PathType Container)) {
             if ($noSwitch) {

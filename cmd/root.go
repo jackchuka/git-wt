@@ -149,18 +149,9 @@ func init() {
 func runRoot(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	// Load config for nocd default
-	cfg, err := git.LoadConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Apply nocd from config if flag not explicitly set
-	effectiveNocd := nocd || cfg.NoCd
-
-	// Handle init flag
+	// Handle init flag (only respects --nocd flag, not wt.nocd config)
 	if initShell != "" {
-		return runInit(initShell, effectiveNocd)
+		return runInit(initShell, nocd)
 	}
 
 	// No arguments: list worktrees
