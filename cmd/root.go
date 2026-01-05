@@ -244,7 +244,7 @@ func completeBranches(cmd *cobra.Command, args []string, toComplete string) ([]s
 				}
 			}
 
-			// Add branch name with [branch: worktree=dir] marker
+			// Add branch name with [branch: worktree=dir] or [worktree: branch=name] marker
 			if wt.Branch != "" && wt.Branch != "(detached)" {
 				if _, exists := seen[wt.Branch]; !exists {
 					seen[wt.Branch] = struct{}{}
@@ -253,15 +253,24 @@ func completeBranches(cmd *cobra.Command, args []string, toComplete string) ([]s
 					if wtDirName != "" {
 						wtInfo = wtDirName
 					}
-					desc := fmt.Sprintf("[branch: worktree=%s]", wtInfo)
-					if msg, err := git.BranchCommitMessage(ctx, wt.Branch); err == nil && msg != "" {
-						desc = fmt.Sprintf("[branch: worktree=%s] %s", wtInfo, truncateString(msg, 40))
+					var desc string
+					// If worktree dir name matches branch name, use [worktree: branch=name] format
+					if wtDirName == wt.Branch {
+						desc = fmt.Sprintf("[worktree: branch=%s]", wt.Branch)
+						if msg, err := git.BranchCommitMessage(ctx, wt.Branch); err == nil && msg != "" {
+							desc = fmt.Sprintf("[worktree: branch=%s] %s", wt.Branch, truncateString(msg, 40))
+						}
+					} else {
+						desc = fmt.Sprintf("[branch: worktree=%s]", wtInfo)
+						if msg, err := git.BranchCommitMessage(ctx, wt.Branch); err == nil && msg != "" {
+							desc = fmt.Sprintf("[branch: worktree=%s] %s", wtInfo, truncateString(msg, 40))
+						}
 					}
 					completions = append(completions, fmt.Sprintf("%s\t%s", wt.Branch, desc))
 				}
 			}
 
-			// Add worktree directory name with [worktree: branch=name] marker
+			// Add worktree directory name with [worktree: branch=name] or [worktree: name] marker
 			if wtDirName != "" {
 				if _, exists := seen[wtDirName]; !exists {
 					seen[wtDirName] = struct{}{}
@@ -270,9 +279,18 @@ func completeBranches(cmd *cobra.Command, args []string, toComplete string) ([]s
 					if branchInfo == "" || branchInfo == "(detached)" {
 						branchInfo = "detached"
 					}
-					desc := fmt.Sprintf("[worktree: branch=%s]", branchInfo)
-					if msg, err := git.BranchCommitMessage(ctx, wt.Branch); err == nil && msg != "" {
-						desc = fmt.Sprintf("[worktree: branch=%s] %s", branchInfo, truncateString(msg, 40))
+					var desc string
+					// If worktree dir name matches branch name, use simpler [worktree: name] format
+					if wtDirName == branchInfo {
+						desc = fmt.Sprintf("[worktree: %s]", wtDirName)
+						if msg, err := git.BranchCommitMessage(ctx, wt.Branch); err == nil && msg != "" {
+							desc = fmt.Sprintf("[worktree: %s] %s", wtDirName, truncateString(msg, 40))
+						}
+					} else {
+						desc = fmt.Sprintf("[worktree: branch=%s]", branchInfo)
+						if msg, err := git.BranchCommitMessage(ctx, wt.Branch); err == nil && msg != "" {
+							desc = fmt.Sprintf("[worktree: branch=%s] %s", branchInfo, truncateString(msg, 40))
+						}
 					}
 					completions = append(completions, fmt.Sprintf("%s\t%s", wtDirName, desc))
 				}
