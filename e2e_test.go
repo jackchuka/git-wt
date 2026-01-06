@@ -593,7 +593,7 @@ func TestE2E_Help(t *testing.T) {
 	}
 
 	expectedStrings := []string{
-		"git wt [branch|worktree]",
+		"git wt [branch|worktree] [start-point]",
 		"--delete",
 		"--force-delete",
 		"--init",
@@ -1671,85 +1671,135 @@ func TestE2E_Complete(t *testing.T) {
 	})
 }
 
-// TestE2E_CreateMultipleWorktrees tests creating multiple worktrees in a single command.
-func TestE2E_CreateMultipleWorktrees(t *testing.T) {
+// TestE2E_CreateWorktreeWithStartPoint tests creating a worktree from a specific start-point.
+func TestE2E_CreateWorktreeWithStartPoint(t *testing.T) {
 	binPath := buildBinary(t)
 
 	repo := testutil.NewTestRepo(t)
 	repo.CreateFile("README.md", "# Test")
 	repo.Commit("initial commit")
 
-	// Create multiple worktrees at once
-	stdout, stderr, err := runGitWtStdout(t, binPath, repo.Root, "branch-a", "branch-b", "branch-c")
+	// Create a commit on main
+	repo.CreateFile("main-file.txt", "main content")
+	repo.Commit("main commit")
+
+	// Create a branch from the first commit
+	repo.Git("branch", "old-base", "HEAD~1")
+
+	// Create worktree from old-base start-point
+	stdout, stderr, err := runGitWtStdout(t, binPath, repo.Root, "feature-from-old", "old-base")
 	if err != nil {
-		t.Fatalf("git-wt with multiple args failed: %v\nstderr: %s", err, stderr)
+		t.Fatalf("git-wt with start-point failed: %v\nstderr: %s", err, stderr)
 	}
 
-	// stdout should contain all worktree paths (one per line)
-	stdoutLines := strings.Split(strings.TrimSpace(stdout), "\n")
-	if len(stdoutLines) != 3 {
-		t.Errorf("stdout should have 3 lines (one per worktree), got %d lines: %q", len(stdoutLines), stdout)
-	}
-	if !strings.Contains(stdout, "branch-a") {
-		t.Errorf("stdout should contain 'branch-a', got: %s", stdout)
-	}
-	if !strings.Contains(stdout, "branch-b") {
-		t.Errorf("stdout should contain 'branch-b', got: %s", stdout)
-	}
-	if !strings.Contains(stdout, "branch-c") {
-		t.Errorf("stdout should contain 'branch-c', got: %s", stdout)
+	wtPath := strings.TrimSpace(stdout)
+
+	// Verify worktree was created
+	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
+		t.Fatalf("worktree was not created at %s", wtPath)
 	}
 
-	// Verify all worktrees were created
-	for _, branch := range []string{"branch-a", "branch-b", "branch-c"} {
-		out, err := runGitWt(t, binPath, repo.Root, branch)
-		if err != nil {
-			t.Errorf("worktree for %s should exist: %v", branch, err)
-			continue
-		}
-		wtPath := worktreePath(out)
-		if _, err := os.Stat(wtPath); os.IsNotExist(err) {
-			t.Errorf("worktree directory for %s should exist at %s", branch, wtPath)
-		}
+	// Verify the worktree is based on old-base (should NOT have main-file.txt)
+	mainFilePath := filepath.Join(wtPath, "main-file.txt")
+	if _, err := os.Stat(mainFilePath); !os.IsNotExist(err) {
+		t.Error("worktree should NOT have main-file.txt (should be based on old-base, not main)")
 	}
 }
 
-// TestE2E_CreateMultipleWorktrees_AllPathsToStdout tests that all paths go to stdout.
-func TestE2E_CreateMultipleWorktrees_AllPathsToStdout(t *testing.T) {
+// TestE2E_CreateWorktreeWithRemoteStartPoint tests creating a worktree from a remote branch.
+func TestE2E_CreateWorktreeWithRemoteStartPoint(t *testing.T) {
+	binPath := buildBinary(t)
+
+	// Create a "remote" repo
+	remoteRepo := testutil.NewTestRepo(t)
+	remoteRepo.CreateFile("README.md", "# Remote")
+	remoteRepo.Commit("remote initial commit")
+	remoteRepo.CreateFile("remote-file.txt", "remote content")
+	remoteRepo.Commit("remote second commit")
+
+	// Clone the remote repo
+	cloneDir := t.TempDir()
+	clonePath := filepath.Join(cloneDir, "clone")
+	cmd := exec.Command("git", "clone", remoteRepo.Root, clonePath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone failed: %v\noutput: %s", err, out)
+	}
+
+	// In the clone, create a new commit on main
+	cmd = exec.Command("git", "checkout", "main")
+	cmd.Dir = clonePath
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git checkout failed: %v\noutput: %s", err, out)
+	}
+
+	// Create worktree from origin/main~1 (first commit)
+	stdout, stderr, err := runGitWtStdout(t, binPath, clonePath, "feature-from-remote", "origin/main~1")
+	if err != nil {
+		t.Fatalf("git-wt with remote start-point failed: %v\nstderr: %s", err, stderr)
+	}
+
+	wtPath := strings.TrimSpace(stdout)
+
+	// Verify worktree was created
+	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
+		t.Fatalf("worktree was not created at %s", wtPath)
+	}
+
+	// Verify the worktree is based on the first commit (should NOT have remote-file.txt)
+	remoteFilePath := filepath.Join(wtPath, "remote-file.txt")
+	if _, err := os.Stat(remoteFilePath); !os.IsNotExist(err) {
+		t.Error("worktree should NOT have remote-file.txt (should be based on origin/main~1)")
+	}
+}
+
+// TestE2E_TooManyArguments tests that more than 2 arguments without -d/-D flag returns an error.
+func TestE2E_TooManyArguments(t *testing.T) {
 	binPath := buildBinary(t)
 
 	repo := testutil.NewTestRepo(t)
 	repo.CreateFile("README.md", "# Test")
 	repo.Commit("initial commit")
 
-	// Create multiple worktrees
-	stdout, _, err := runGitWtStdout(t, binPath, repo.Root, "multi-a", "multi-b")
+	// Try to pass 3 arguments (should fail)
+	_, err := runGitWt(t, binPath, repo.Root, "branch-a", "branch-b", "branch-c")
+	if err == nil {
+		t.Fatal("command should fail when passing more than 2 arguments without -d/-D flag")
+	}
+}
+
+// TestE2E_StartPointIgnoredForExistingBranch tests that start-point is ignored when branch already exists.
+func TestE2E_StartPointIgnoredForExistingBranch(t *testing.T) {
+	binPath := buildBinary(t)
+
+	repo := testutil.NewTestRepo(t)
+	repo.CreateFile("README.md", "# Test")
+	repo.Commit("initial commit")
+
+	// Create a branch
+	repo.Git("branch", "existing-branch")
+
+	// Create another commit on main
+	repo.CreateFile("new-file.txt", "new content")
+	repo.Commit("second commit")
+
+	// Create worktree for existing branch with a start-point (should be ignored)
+	stdout, stderr, err := runGitWtStdout(t, binPath, repo.Root, "existing-branch", "main")
 	if err != nil {
-		t.Fatalf("git-wt failed: %v", err)
+		t.Fatalf("git-wt failed: %v\nstderr: %s", err, stderr)
 	}
 
-	// stdout should contain both paths
-	lines := strings.Split(strings.TrimSpace(stdout), "\n")
-	if len(lines) != 2 {
-		t.Errorf("stdout should have 2 lines, got %d: %q", len(lines), stdout)
+	wtPath := strings.TrimSpace(stdout)
+
+	// Verify worktree was created
+	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
+		t.Fatalf("worktree was not created at %s", wtPath)
 	}
 
-	// Both paths should be valid directories
-	for _, line := range lines {
-		info, err := os.Stat(line)
-		if err != nil {
-			t.Errorf("path does not exist: %s", line)
-		} else if !info.IsDir() {
-			t.Errorf("path should be a directory, got: %s", line)
-		}
-	}
-
-	// stdout should contain both worktree names
-	if !strings.Contains(stdout, "multi-a") {
-		t.Errorf("stdout should contain 'multi-a', got: %s", stdout)
-	}
-	if !strings.Contains(stdout, "multi-b") {
-		t.Errorf("stdout should contain 'multi-b', got: %s", stdout)
+	// Verify the worktree is based on existing-branch (should NOT have new-file.txt)
+	// because start-point is ignored for existing branches
+	newFilePath := filepath.Join(wtPath, "new-file.txt")
+	if _, err := os.Stat(newFilePath); !os.IsNotExist(err) {
+		t.Error("worktree should NOT have new-file.txt (start-point should be ignored for existing branch)")
 	}
 }
 
@@ -1761,25 +1811,20 @@ func TestE2E_DeleteMultipleWorktrees(t *testing.T) {
 	repo.CreateFile("README.md", "# Test")
 	repo.Commit("initial commit")
 
-	// Create multiple worktrees first
-	_, err := runGitWt(t, binPath, repo.Root, "del-a", "del-b", "del-c")
-	if err != nil {
-		t.Fatalf("failed to create worktrees: %v", err)
-	}
-
-	// Get paths before deletion
+	// Create multiple worktrees first (one by one)
 	outA, err := runGitWt(t, binPath, repo.Root, "del-a")
 	if err != nil {
-		t.Fatalf("failed to get worktree path for del-a: %v", err)
+		t.Fatalf("failed to create worktree del-a: %v", err)
 	}
 	outB, err := runGitWt(t, binPath, repo.Root, "del-b")
 	if err != nil {
-		t.Fatalf("failed to get worktree path for del-b: %v", err)
+		t.Fatalf("failed to create worktree del-b: %v", err)
 	}
 	outC, err := runGitWt(t, binPath, repo.Root, "del-c")
 	if err != nil {
-		t.Fatalf("failed to get worktree path for del-c: %v", err)
+		t.Fatalf("failed to create worktree del-c: %v", err)
 	}
+
 	pathA := worktreePath(outA)
 	pathB := worktreePath(outB)
 	pathC := worktreePath(outC)
@@ -1817,16 +1862,14 @@ func TestE2E_DeleteMultipleWorktrees_StopsOnError(t *testing.T) {
 	repo.CreateFile("README.md", "# Test")
 	repo.Commit("initial commit")
 
-	// Create two worktrees
-	_, err := runGitWt(t, binPath, repo.Root, "stop-a", "stop-c")
+	// Create two worktrees (one by one)
+	_, err := runGitWt(t, binPath, repo.Root, "stop-a")
 	if err != nil {
-		t.Fatalf("failed to create worktrees: %v", err)
+		t.Fatalf("failed to create worktree stop-a: %v", err)
 	}
-
-	// Get path for stop-c before deletion attempt
 	outC, err := runGitWt(t, binPath, repo.Root, "stop-c")
 	if err != nil {
-		t.Fatalf("failed to get worktree path for stop-c: %v", err)
+		t.Fatalf("failed to create worktree stop-c: %v", err)
 	}
 	pathC := worktreePath(outC)
 

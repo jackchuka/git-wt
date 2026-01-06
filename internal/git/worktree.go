@@ -194,7 +194,8 @@ func AddWorktree(ctx context.Context, path, branch string, copyOpts CopyOptions)
 }
 
 // AddWorktreeWithNewBranch creates a new worktree with a new branch.
-func AddWorktreeWithNewBranch(ctx context.Context, path, branch string, copyOpts CopyOptions) error {
+// If startPoint is specified, the new branch will be created from that commit/branch.
+func AddWorktreeWithNewBranch(ctx context.Context, path, branch, startPoint string, copyOpts CopyOptions) error {
 	// Get source root before creating worktree
 	srcRoot, err := RepoRoot(ctx)
 	if err != nil {
@@ -207,7 +208,13 @@ func AddWorktreeWithNewBranch(ctx context.Context, path, branch string, copyOpts
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
-	cmd, err := gitCommand(ctx, "worktree", "add", "-b", branch, path)
+	// Build command arguments
+	args := []string{"worktree", "add", "-b", branch, path}
+	if startPoint != "" {
+		args = append(args, startPoint)
+	}
+
+	cmd, err := gitCommand(ctx, args...)
 	if err != nil {
 		return err
 	}

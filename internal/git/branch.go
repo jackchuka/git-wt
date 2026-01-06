@@ -124,6 +124,27 @@ func BranchCommitMessage(ctx context.Context, branch string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// ListRemoteBranches returns a list of all remote branch names (e.g., origin/main).
+func ListRemoteBranches(ctx context.Context) ([]string, error) {
+	cmd, err := gitCommand(ctx, "branch", "-r", "--format=%(refname:short)")
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var branches []string
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		if line != "" && !strings.HasSuffix(line, "/HEAD") {
+			branches = append(branches, line)
+		}
+	}
+	return branches, nil
+}
+
 // DefaultBranch returns the default branch name (e.g., main, master).
 func DefaultBranch(ctx context.Context) (string, error) {
 	// Try to get from remote origin

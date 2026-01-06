@@ -50,15 +50,16 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "git wt [branch|worktree]",
+	Use:   "git wt [branch|worktree] [start-point]",
 	Short: "A Git subcommand that makes 'git worktree' simple",
 	Long: `git-wt is a Git subcommand that makes 'git worktree' simple.
 
 Examples:
-  git wt                List all worktrees
-  git wt <branch|worktree>  Switch to worktree (create worktree/branch if needed)
-  git wt -d <branch|worktree>  Delete worktree and branch (safe)
-  git wt -D <branch|worktree>  Force delete worktree and branch
+  git wt                                    List all worktrees
+  git wt <branch|worktree>                  Switch to worktree (create worktree/branch if needed)
+  git wt <branch|worktree> <start-point>    Create worktree from start-point (e.g., origin/main)
+  git wt -d <branch|worktree>...            Delete worktree and branch (safe)
+  git wt -D <branch|worktree>...            Force delete worktree and branch
 
 Shell Integration:
   Add the following to your shell config to enable worktree switching and completion:
@@ -159,19 +160,32 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return listWorktrees(ctx)
 	}
 
-	// Remove duplicates while preserving order
-	args = uniqueArgs(args)
-
-	// Handle delete flags
+	// Handle delete flags (multiple arguments allowed)
 	if forceDeleteFlag {
+		// Remove duplicates while preserving order
+		args = uniqueArgs(args)
 		return deleteWorktrees(ctx, args, true)
 	}
 	if deleteFlag {
+		// Remove duplicates while preserving order
+		args = uniqueArgs(args)
 		return deleteWorktrees(ctx, args, false)
 	}
 
-	// Default: create or switch to worktrees
-	return handleWorktrees(ctx, cmd, args)
+	// For create/switch: validate argument count (like git branch)
+	// git wt <branch> [<start-point>]
+	if len(args) > 2 {
+		return fmt.Errorf("too many arguments: expected <branch> [<start-point>], got %d arguments", len(args))
+	}
+
+	branch := args[0]
+	var startPoint string
+	if len(args) == 2 {
+		startPoint = args[1]
+	}
+
+	// Default: create or switch to worktree
+	return handleWorktree(ctx, cmd, branch, startPoint)
 }
 
 // loadConfig loads config from git config and applies flag overrides.
@@ -206,6 +220,14 @@ func loadConfig(ctx context.Context, cmd *cobra.Command) (git.Config, error) {
 
 func completeBranches(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := cmd.Context()
+
+	// For second argument (start-point), complete with branches including remote
+	if len(args) == 1 && !deleteFlag && !forceDeleteFlag {
+		return completeStartPoint(ctx)
+	}
+
+	// For delete flags, allow multiple arguments (same completion as first arg)
+	// For first argument or delete mode, complete with worktrees and local branches
 
 	// Collect unique branch names and worktree directory names
 	seen := make(map[string]struct{})
@@ -299,6 +321,45 @@ func completeBranches(cmd *cobra.Command, args []string, toComplete string) ([]s
 				desc := "[branch]"
 				if msg, err := git.BranchCommitMessage(ctx, branch); err == nil && msg != "" {
 					desc = "[branch] " + truncateString(msg, 40)
+				}
+				completions = append(completions, fmt.Sprintf("%s\t%s", branch, desc))
+			}
+		}
+	}
+
+	return completions, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeStartPoint returns completion for start-point (second argument).
+// It includes local branches, remote branches, and tags.
+func completeStartPoint(ctx context.Context) ([]string, cobra.ShellCompDirective) {
+	seen := make(map[string]struct{})
+	var completions []string
+
+	// Add local branches
+	branches, err := git.ListBranches(ctx)
+	if err == nil {
+		for _, branch := range branches {
+			if _, exists := seen[branch]; !exists {
+				seen[branch] = struct{}{}
+				desc := "[branch]"
+				if msg, err := git.BranchCommitMessage(ctx, branch); err == nil && msg != "" {
+					desc = "[branch] " + truncateString(msg, 40)
+				}
+				completions = append(completions, fmt.Sprintf("%s\t%s", branch, desc))
+			}
+		}
+	}
+
+	// Add remote branches
+	remoteBranches, err := git.ListRemoteBranches(ctx)
+	if err == nil {
+		for _, branch := range remoteBranches {
+			if _, exists := seen[branch]; !exists {
+				seen[branch] = struct{}{}
+				desc := "[remote]"
+				if msg, err := git.BranchCommitMessage(ctx, branch); err == nil && msg != "" {
+					desc = "[remote] " + truncateString(msg, 40)
 				}
 				completions = append(completions, fmt.Sprintf("%s\t%s", branch, desc))
 			}
@@ -419,7 +480,7 @@ func deleteWorktrees(ctx context.Context, branches []string, force bool) error {
 	return nil
 }
 
-func handleWorktrees(ctx context.Context, cmd *cobra.Command, branches []string) error {
+func handleWorktree(ctx context.Context, cmd *cobra.Command, branch, startPoint string) error {
 	// Load config with flag overrides
 	cfg, err := loadConfig(ctx, cmd)
 	if err != nil {
@@ -434,53 +495,53 @@ func handleWorktrees(ctx context.Context, cmd *cobra.Command, branches []string)
 		NoCopy:        cfg.NoCopy,
 	}
 
-	for _, branch := range branches {
-		// Check if worktree already exists for this branch or directory name
-		wt, err := git.FindWorktreeByBranchOrDir(ctx, branch)
-		if err != nil {
-			return fmt.Errorf("failed to find worktree: %w", err)
-		}
-
-		if wt != nil {
-			// Worktree exists, print path to stdout
-			fmt.Println(wt.Path)
-			continue
-		}
-
-		// Get worktree path
-		wtPath, err := git.WorktreePathFor(ctx, cfg.BaseDir, branch)
-		if err != nil {
-			return fmt.Errorf("failed to get worktree path: %w", err)
-		}
-
-		// Check if branch exists
-		exists, err := git.BranchExists(ctx, branch)
-		if err != nil {
-			return fmt.Errorf("failed to check branch: %w", err)
-		}
-
-		if exists {
-			// Branch exists, create worktree with existing branch
-			if err := git.AddWorktree(ctx, wtPath, branch, copyOpts); err != nil {
-				return fmt.Errorf("failed to create worktree: %w", err)
-			}
-		} else {
-			// Branch doesn't exist, create new branch and worktree
-			if err := git.AddWorktreeWithNewBranch(ctx, wtPath, branch, copyOpts); err != nil {
-				return fmt.Errorf("failed to create worktree with new branch: %w", err)
-			}
-		}
-
-		// Run hooks after creating new worktree
-		if err := git.RunHooks(ctx, cfg.Hooks, wtPath, os.Stderr); err != nil {
-			// Print path but return error so shell integration won't cd
-			fmt.Println(wtPath)
-			return err
-		}
-
-		// Print path to stdout
-		fmt.Println(wtPath)
+	// Check if worktree already exists for this branch or directory name
+	wt, err := git.FindWorktreeByBranchOrDir(ctx, branch)
+	if err != nil {
+		return fmt.Errorf("failed to find worktree: %w", err)
 	}
+
+	if wt != nil {
+		// Worktree exists, print path to stdout
+		// start-point is ignored when switching to existing worktree
+		fmt.Println(wt.Path)
+		return nil
+	}
+
+	// Get worktree path
+	wtPath, err := git.WorktreePathFor(ctx, cfg.BaseDir, branch)
+	if err != nil {
+		return fmt.Errorf("failed to get worktree path: %w", err)
+	}
+
+	// Check if branch exists
+	exists, err := git.BranchExists(ctx, branch)
+	if err != nil {
+		return fmt.Errorf("failed to check branch: %w", err)
+	}
+
+	if exists {
+		// Branch exists, create worktree with existing branch
+		// start-point is ignored when using existing branch
+		if err := git.AddWorktree(ctx, wtPath, branch, copyOpts); err != nil {
+			return fmt.Errorf("failed to create worktree: %w", err)
+		}
+	} else {
+		// Branch doesn't exist, create new branch and worktree
+		if err := git.AddWorktreeWithNewBranch(ctx, wtPath, branch, startPoint, copyOpts); err != nil {
+			return fmt.Errorf("failed to create worktree with new branch: %w", err)
+		}
+	}
+
+	// Run hooks after creating new worktree
+	if err := git.RunHooks(ctx, cfg.Hooks, wtPath, os.Stderr); err != nil {
+		// Print path but return error so shell integration won't cd
+		fmt.Println(wtPath)
+		return err
+	}
+
+	// Print path to stdout
+	fmt.Println(wtPath)
 	return nil
 }
 

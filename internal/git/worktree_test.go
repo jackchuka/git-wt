@@ -175,7 +175,7 @@ func TestAddWorktreeWithNewBranch(t *testing.T) {
 	defer restore()
 
 	wtPath := filepath.Join(repo.ParentDir(), "worktree-new")
-	err := AddWorktreeWithNewBranch(t.Context(), wtPath, "new-branch", CopyOptions{})
+	err := AddWorktreeWithNewBranch(t.Context(), wtPath, "new-branch", "", CopyOptions{})
 	if err != nil {
 		t.Fatalf("AddWorktreeWithNewBranch failed: %v", err)
 	}
