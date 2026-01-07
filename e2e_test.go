@@ -1415,12 +1415,12 @@ echo "EXISTING_PWD=$EXISTING_PWD"
 
 			// With wt.nocd=create, creating new worktree should NOT cd
 			if strings.Contains(newPwd, "nocd-create-"+tt.name+"-new") {
-				t.Errorf("NEW_PWD should NOT contain worktree path when creating new worktree with wt.nocd=create, got: %s", newPwd)
+				t.Errorf("NEW_PWD should NOT contain worktree path when creating new worktree with wt.nocd=create, got: %s", newPwd) //nostyle:errorstrings
 			}
 
 			// With wt.nocd=create, switching to existing worktree should cd
 			if !strings.Contains(existingPwd, "nocd-create-"+tt.name+"-new") {
-				t.Errorf("EXISTING_PWD should contain worktree path when switching to existing worktree with wt.nocd=create, got: %s", existingPwd)
+				t.Errorf("EXISTING_PWD should contain worktree path when switching to existing worktree with wt.nocd=create, got: %s", existingPwd) //nostyle:errorstrings
 			}
 		})
 	}
